@@ -2,9 +2,9 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: splunk-kubernetes-logging
+  name: splunk-kubernetes-logging-lin
   labels:
-    app: splunk-kubernetes-logging
+    app: splunk-kubernetes-logging-lin
     version: 1.2.0
 data:
   fluent.conf: |-
@@ -27,7 +27,6 @@ data:
     # to the docker logs for pods in the /var/log/containers directory on the host.
     # If running this fluentd configuration in a Docker container, the /var/log
     # directory should be mounted in the container.
-    # reading kubelet logs from journal
     #
     # Reference:
     # https://github.com/kubernetes/community/blob/20d2f6f5498a5668bae2aea9dcaf4875b9c06ccb/contributors/design-proposals/node/kubelet-cri-logging.md
