@@ -40,8 +40,8 @@ data:
       @type tail
       @label @SPLUNK
       tag tail.containers.*
-      path /var/log/containers/*.log
-      pos_file /var/log/splunk-fluentd-containers.log.pos
+      path C:/var/log/containers/*.log
+      pos_file C:/var/log/splunk-fluentd-containers.log.pos
       path_key source
       read_from_head true
       <parse>
@@ -61,7 +61,7 @@ data:
       @label @SPLUNK
       tag file.kube:kubelet
       path C:/var/log/kubelet-*.log
-      pos_file /var/log/splunk-fluentd-kubelet.log.pos
+      pos_file C:/var/log/splunk-fluentd-kubelet.log.pos
       path_key source
       read_from_head true
       <parse>
@@ -80,7 +80,7 @@ data:
       @label @SPLUNK
       tag file.kube:kube-proxy
       path C:/var/log/kube-proxy-*.log
-      pos_file /var/log/splunk-fluentd-kube-proxy.log.pos
+      pos_file C:/var/log/splunk-fluentd-kube-proxy.log.pos
       path_key source
       read_from_head true
       <parse>
@@ -99,7 +99,7 @@ data:
       @label @SPLUNK
       tag file.kube:flanneld
       path C:/var/log/flanneld-*.log
-      pos_file /var/log/splunk-fluentd-flanneld.log.pos
+      pos_file C:/var/log/splunk-fluentd-flanneld.log.pos
       path_key source
       read_from_head true
       <parse>
@@ -200,13 +200,13 @@ data:
       # extract index fields and sourcetype for container logs
       <filter tail.containers.**>
         @type jq_transformer
-        jq "def find_sourcetype(pod; container_name): container_name + \"/\" + pod | if startswith(\"dns-controller/dns-controller\") then \"kube:dns-controller\" elif startswith(\"sidecar/kube-dns\") then \"kube:kubedns-sidecar\" elif startswith(\"dnsmasq/kube-dns\") then \"kube:dnsmasq\" elif startswith(\"etcd-container/etcd-server\") then \"kube:etcd\" elif startswith(\"etcd-container/etcd-server-events\") then \"kube:etcd-events\" elif startswith(\"kube-apiserver/kube-apiserver\") then \"kube:kube-apiserver\" elif startswith(\"kube-controller-manager/kube-controller-manager\") then \"kube:kube-controller-manager\" elif startswith(\"autoscaler/kube-dns-autoscaler\") then \"kube:kube-dns-autoscaler\" elif startswith(\"kube-proxy/kube-proxy\") then \"kube:kube-proxy\" elif startswith(\"kube-scheduler/kube-scheduler\") then \"kube:kube-scheduler\" elif startswith(\"kubedns/kube-dns\") then \"kube:kubedns\" else empty end;  def set_namespace(value): if value == \"default\" then \"main\"else value end;  def extract_container_info:   (.source | ltrimstr(\"/var/log/containers/\") | split(\"_\")) as $parts   | ($parts[-1] | split(\"-\")) as $cparts   | .pod = $parts[0]   | .namespace = set_namespace($parts[1])   | .container_name = ($cparts[:-1] | join(\"-\"))   | .container_id = ($cparts[-1] | rtrimstr(\".log\"))   | .cluster_name = \"cluster_name\"   | .;  .record | extract_container_info | .sourcetype = (find_sourcetype(.pod; .container_name) // \"kube:container:\\(.container_name)\")"
+        jq "def find_sourcetype(pod; container_name): container_name + \"/\" + pod | if startswith(\"dns-controller/dns-controller\") then \"kube:dns-controller\" elif startswith(\"sidecar/kube-dns\") then \"kube:kubedns-sidecar\" elif startswith(\"dnsmasq/kube-dns\") then \"kube:dnsmasq\" elif startswith(\"etcd-container/etcd-server\") then \"kube:etcd\" elif startswith(\"etcd-container/etcd-server-events\") then \"kube:etcd-events\" elif startswith(\"kube-apiserver/kube-apiserver\") then \"kube:kube-apiserver\" elif startswith(\"kube-controller-manager/kube-controller-manager\") then \"kube:kube-controller-manager\" elif startswith(\"autoscaler/kube-dns-autoscaler\") then \"kube:kube-dns-autoscaler\" elif startswith(\"kube-proxy/kube-proxy\") then \"kube:kube-proxy\" elif startswith(\"kube-scheduler/kube-scheduler\") then \"kube:kube-scheduler\" elif startswith(\"kubedns/kube-dns\") then \"kube:kubedns\" else empty end;  def set_namespace(value): if value == \"default\" then \"main\"else value end;  def extract_container_info:   (.source | ltrimstr(\"C:/var/log/containers/\") | split(\"_\")) as $parts   | ($parts[-1] | split(\"-\")) as $cparts   | .pod = $parts[0]   | .namespace = set_namespace($parts[1])   | .container_name = ($cparts[:-1] | join(\"-\"))   | .container_id = ($cparts[-1] | rtrimstr(\".log\"))   | .cluster_name = \"cluster_name\"   | .;  .record | extract_container_info | .sourcetype = (find_sourcetype(.pod; .container_name) // \"kube:container:\\(.container_name)\")"
       </filter>
 
       # create source and sourcetype
       <filter file.**>
         @type jq_transformer
-        jq '.record.source = "/var/log" + .record.source | .record.sourcetype = (.tag | ltrimstr("file.")) | .record'
+        jq '.record.source = "C:/var/log" + .record.source | .record.sourcetype = (.tag | ltrimstr("file.")) | .record'
       </filter>
 
       # = filters for non-container log files =
