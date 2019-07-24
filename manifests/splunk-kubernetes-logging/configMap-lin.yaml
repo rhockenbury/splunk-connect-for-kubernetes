@@ -3,6 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: splunk-kubernetes-logging-lin
+  namespace: fluentd
   labels:
     app: splunk-kubernetes-logging-lin
     version: 1.2.0
@@ -61,7 +62,7 @@ data:
       @type systemd
       @label @SPLUNK
       tag journald.kube:docker
-      path "/run/log/journal"
+      path "/var/log/journal"
       filters [{ "_SYSTEMD_UNIT": "docker.service" }]
       read_from_head true
       <storage>
@@ -79,7 +80,7 @@ data:
       @type systemd
       @label @SPLUNK
       tag journald.kube:kubelet
-      path "/run/log/journal"
+      path "/var/log/journal"
       filters [{ "_SYSTEMD_UNIT": "kubelet.service" }]
       read_from_head true
       <storage>
@@ -174,11 +175,39 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
+      <filter tail.containers.var.log.containers.splunk-kubernetes-logging*splunk-fluentd-k8s*.log>
+        @type concat
+        key log
+        timeout_label @SPLUNK
+        stream_identity_key stream
+        multiline_start_regexp /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/
+        flush_interval 5s
+      </filter>
 
       # extract index fields and sourcetype for container logs
       <filter tail.containers.**>
-        @type jq_transformer
-        jq "def find_sourcetype(pod; container_name): container_name + \"/\" + pod | if startswith(\"dns-controller/dns-controller\") then \"kube:dns-controller\" elif startswith(\"sidecar/kube-dns\") then \"kube:kubedns-sidecar\" elif startswith(\"dnsmasq/kube-dns\") then \"kube:dnsmasq\" elif startswith(\"etcd-container/etcd-server\") then \"kube:etcd\" elif startswith(\"etcd-container/etcd-server-events\") then \"kube:etcd-events\" elif startswith(\"kube-apiserver/kube-apiserver\") then \"kube:kube-apiserver\" elif startswith(\"kube-controller-manager/kube-controller-manager\") then \"kube:kube-controller-manager\" elif startswith(\"autoscaler/kube-dns-autoscaler\") then \"kube:kube-dns-autoscaler\" elif startswith(\"kube-proxy/kube-proxy\") then \"kube:kube-proxy\" elif startswith(\"kube-scheduler/kube-scheduler\") then \"kube:kube-scheduler\" elif startswith(\"kubedns/kube-dns\") then \"kube:kubedns\" else empty end;  def set_namespace(value): if value == \"default\" then \"main\"else value end;  def extract_container_info:   (.source | ltrimstr(\"/var/log/containers/\") | split(\"_\")) as $parts   | ($parts[-1] | split(\"-\")) as $cparts   | .pod = $parts[0]   | .namespace = set_namespace($parts[1])   | .container_name = ($cparts[:-1] | join(\"-\"))   | .container_id = ($cparts[-1] | rtrimstr(\".log\"))   | .cluster_name = \"cluster_name\"   | .;  .record | extract_container_info | .sourcetype = (find_sourcetype(.pod; .container_name) // \"kube:container:\\(.container_name)\")"
+        @type record_transformer
+        enable_ruby
+        <record>
+          pod ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[0]}
+          namespace ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[1]}
+          container_name ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[-1].split("-")[0..-2].join("-")}
+          container_id ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[-1].split("-")[-1].chomp(".log")}
+        </record>
+      </filter>
+      <filter tail.containers.**>
+        @type record_transformer
+        enable_ruby
+        <record>
+          sourcetype ${(case "#{record["container_name"]}/#{record["pod"]}"; when "dns-controller/dns-controller" then "kube:dns-controller"; when "sidecar/kube-dns" then "kube:kubedns-sidecar"; when "dnsmasq/kube-dns" then "kube:dnsmasq"; when "etcd-container/etcd-server" then "kube:etcd"; when "etcd-container/etcd-server-events" then "kube:etcd-events"; when "kube-apiserver/kube-apiserver" then "kube:kube-apiserver"; when "kube-controller-manager/kube-controller-manager" then "kube:kube-controller-manager"; when "autoscaler/kube-dns-autoscaler" then "kube:kube-dns-autoscaler"; when "kube-proxy/kube-proxy" then "kube:kube-proxy"; when "kube-scheduler/kube-scheduler" then "kube:kube-scheduler"; when "kubedns/kube-dns" then "kube:kubedns"; else nil end;) || "kube:container:#{record["container_name"]}"}
+        </record>
+      </filter>
+      <filter tail.containers.**>
+        @type record_transformer
+        enable_ruby
+        <record>
+          sourcetype ${case "#{record["container_name"]}"; when "kube-proxy" then "kube:kube-proxy"; when "kube-flannel" then "kube:flanneld"; else "#{record["sourcetype"]}" end}
+        </record>
       </filter>
 
       # = filters for journald logs =
@@ -189,19 +218,49 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
+      <filter journald.kube:kubelet journald.kube tail.containers.kube-proxy tail.containers.kube-flannel>
+        @type parser
+        key_name log
+        <parse>
+          @type regexp
+          expression /^(?<severity>\w)(?<logtime>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<file>[^ \]]+)\] (?<message>.*)/
+        </parse>
+      </filter>
 
       # create source and sourcetype
-      <filter journald.**>
-        @type jq_transformer
-        jq '.record.source = "/run/log/journal/" + .record.source | .record.sourcetype = (.tag | ltrimstr("journald.")) | .record'
+      <filter journald.kube:kubelet journald.kube>
+        @type record_transformer
+        <record>
+          source "/var/log/journal/kubelet.service"
+          sourcetype "kube:kubelet"
+        </record>
+      </filter>
+      <filter journald.kube:docker>
+        @type record_transformer
+        <record>
+          source "/var/log/journal/docker.service"
+          sourcetype "kube:docker"
+        </record>
       </filter>
 
       # = filters for non-container log files =
 
       # = filters for monitor agent =
       <filter monitor_agent>
-        @type jq_transformer
-        jq ".record.source = \"namespace:#{ENV['MY_NAMESPACE']}/pod:#{ENV['MY_POD_NAME']}\" | .record.sourcetype = \"fluentd:monitor-agent\" | .record"
+        @type record_transformer
+        enable_ruby
+        <record>
+          source ${"namespace:#{ENV['MY_NAMESPACE']}/pod:#{ENV['MY_POD_NAME']}"}
+          sourcetype ${"fluentd:monitor-agent"}
+        </record>
+      </filter>
+
+      # = add cluster name to everything =
+      <filter **>
+        @type record_transformer
+        <record>
+          cluster_name "#{ENV['CLUSTER_NAME']}"
+        </record>
       </filter>
 
       # = output =
@@ -211,7 +270,7 @@ data:
         hec_host MY-SPLUNK-HOST
         hec_port 8088
         hec_token "#{ENV['SPLUNK_HEC_TOKEN']}"
-        host "#{ENV['SPLUNK_HEC_HOST']}"
+        host "#{ENV['NODE_NAME']}"
         source_key source
         sourcetype_key sourcetype
         insecure_ssl true
@@ -232,7 +291,7 @@ data:
           retry_max_times 3
           total_limit_size 600m
         </buffer>
-        <format monitor_agent>
+        <format monitor_agent journald.kube:kubelet journald.kube tail.containers.kube-proxy tail.containers.kube-flannel>
           @type json
         </format>
         <format>

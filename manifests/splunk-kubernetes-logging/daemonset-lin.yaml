@@ -3,11 +3,15 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: splunk-kubernetes-logging-lin
+  namespace: fluentd
   labels:
     app: splunk-kubernetes-logging-lin
     engine: fluentd
     version: 1.2.0
 spec:
+  selector:
+    matchLabels:
+      app: splunk-kubernetes-logging-lin
   template:
     metadata:
       labels:
@@ -76,7 +80,7 @@ spec:
           path: "/run/log/journal"
       - name: conf-configmap
         configMap:
-          name: splunk-kubernetes-logging
+          name: splunk-kubernetes-logging-lin
       - name: secrets
         secret:
           secretName: splunk-kubernetes-logging

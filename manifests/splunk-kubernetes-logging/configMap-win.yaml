@@ -3,6 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: splunk-kubernetes-logging-win
+  namespace: fluentd
   labels:
     app: splunk-kubernetes-logging-win
     version: 1.2.0
@@ -60,18 +61,19 @@ data:
       @type tail
       @label @SPLUNK
       tag file.kube:kubelet
-      path C:/var/log/kubelet-*.log
+      path C:/var/log/kubelet*.log
       pos_file C:/var/log/splunk-fluentd-kubelet.log.pos
       path_key source
       read_from_head true
       <parse>
         @type multiline
         format_firstline /^\w\d{4}/
-        format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+        format1 /^(?<severity>\w)(?<logtime>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<file>[^ \]]+)\] (?<message>.*)/
         time_key time
         time_type string
         time_format %m%d %H:%M:%S.%N
         localtime false
+        keep_time_key true
       </parse>
     </source>
     <source>
@@ -79,18 +81,19 @@ data:
       @type tail
       @label @SPLUNK
       tag file.kube:kube-proxy
-      path C:/var/log/kube-proxy-*.log
+      path C:/var/log/kube-proxy*.log
       pos_file C:/var/log/splunk-fluentd-kube-proxy.log.pos
       path_key source
       read_from_head true
       <parse>
         @type multiline
         format_firstline /^\w\d{4}/
-        format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+        format1 /^(?<severity>\w)(?<logtime>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<file>[^ \]]+)\] (?<message>.*)/
         time_key time
         time_type string
         time_format %m%d %H:%M:%S.%N
         localtime false
+        keep_time_key true
       </parse>
     </source>
     <source>
@@ -98,18 +101,19 @@ data:
       @type tail
       @label @SPLUNK
       tag file.kube:flanneld
-      path C:/var/log/flanneld-*.log
+      path C:/var/log/flanneld*.log
       pos_file C:/var/log/splunk-fluentd-flanneld.log.pos
       path_key source
       read_from_head true
       <parse>
         @type multiline
         format_firstline /^\w\d{4}/
-        format1 /^(?<severity>\w)(?<time>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<source>[^ \]]+)\] (?<message>.*)/
+        format1 /^(?<severity>\w)(?<logtime>\d{4} [^\s]*)\s+(?<pid>\d+)\s+(?<file>[^ \]]+)\] (?<message>.*)/
         time_key time
         time_type string
         time_format %m%d %H:%M:%S.%N
         localtime false
+        keep_time_key true
       </parse>
     </source>
   source.journald.conf: |-
@@ -124,7 +128,7 @@ data:
   output.conf: |-
     <label @SPLUNK>
       # = filters for container logs =
-      <filter tail.containers.var.log.containers.dns-controller*dns-controller*.log>
+      <filter tail.containers.C:.var.log.containers.dns-controller*dns-controller*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -132,7 +136,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-dns*sidecar*.log>
+      <filter tail.containers.C:.var.log.containers.kube-dns*sidecar*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -140,7 +144,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-dns*dnsmasq*.log>
+      <filter tail.containers.C:.var.log.containers.kube-dns*dnsmasq*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -148,7 +152,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-apiserver*kube-apiserver*.log>
+      <filter tail.containers.C:.var.log.containers.kube-apiserver*kube-apiserver*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -156,7 +160,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-controller-manager*kube-controller-manager*.log>
+      <filter tail.containers.C:.var.log.containers.kube-controller-manager*kube-controller-manager*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -164,7 +168,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-dns-autoscaler*autoscaler*.log>
+      <filter tail.containers.C:.var.log.containers.kube-dns-autoscaler*autoscaler*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -172,7 +176,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-proxy*kube-proxy*.log>
+      <filter tail.containers.C:.var.log.containers.kube-scheduler*kube-scheduler*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -180,7 +184,7 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-scheduler*kube-scheduler*.log>
+      <filter tail.containers.C:.var.log.containers.kube-dns*kubedns*.log>
         @type concat
         key log
         timeout_label @SPLUNK
@@ -188,33 +192,64 @@ data:
         multiline_start_regexp /^\w[0-1]\d[0-3]\d/
         flush_interval 5s
       </filter>
-      <filter tail.containers.var.log.containers.kube-dns*kubedns*.log>
+      <filter tail.containers.C:.var.log.containers.splunk-kubernetes-logging*splunk-fluentd-k8s*.log>
         @type concat
         key log
         timeout_label @SPLUNK
         stream_identity_key stream
-        multiline_start_regexp /^\w[0-1]\d[0-3]\d/
+        multiline_start_regexp /^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}/
         flush_interval 5s
       </filter>
 
-      # extract index fields and sourcetype for container logs
       <filter tail.containers.**>
-        @type jq_transformer
-        jq "def find_sourcetype(pod; container_name): container_name + \"/\" + pod | if startswith(\"dns-controller/dns-controller\") then \"kube:dns-controller\" elif startswith(\"sidecar/kube-dns\") then \"kube:kubedns-sidecar\" elif startswith(\"dnsmasq/kube-dns\") then \"kube:dnsmasq\" elif startswith(\"etcd-container/etcd-server\") then \"kube:etcd\" elif startswith(\"etcd-container/etcd-server-events\") then \"kube:etcd-events\" elif startswith(\"kube-apiserver/kube-apiserver\") then \"kube:kube-apiserver\" elif startswith(\"kube-controller-manager/kube-controller-manager\") then \"kube:kube-controller-manager\" elif startswith(\"autoscaler/kube-dns-autoscaler\") then \"kube:kube-dns-autoscaler\" elif startswith(\"kube-proxy/kube-proxy\") then \"kube:kube-proxy\" elif startswith(\"kube-scheduler/kube-scheduler\") then \"kube:kube-scheduler\" elif startswith(\"kubedns/kube-dns\") then \"kube:kubedns\" else empty end;  def set_namespace(value): if value == \"default\" then \"main\"else value end;  def extract_container_info:   (.source | ltrimstr(\"C:/var/log/containers/\") | split(\"_\")) as $parts   | ($parts[-1] | split(\"-\")) as $cparts   | .pod = $parts[0]   | .namespace = set_namespace($parts[1])   | .container_name = ($cparts[:-1] | join(\"-\"))   | .container_id = ($cparts[-1] | rtrimstr(\".log\"))   | .cluster_name = \"cluster_name\"   | .;  .record | extract_container_info | .sourcetype = (find_sourcetype(.pod; .container_name) // \"kube:container:\\(.container_name)\")"
+        @type record_transformer
+        enable_ruby
+        <record>
+          pod ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[0]}
+          namespace ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[1]}
+          container_name ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[-1].split("-")[0..-2].join("-")}
+          container_id ${record["source"].tap{|s| s.slice!("\\var\\log\\containers\\")}.split("_")[-1].split("-")[-1].chomp(".log")}
+        </record>
       </filter>
-
-      # create source and sourcetype
-      <filter file.**>
-        @type jq_transformer
-        jq '.record.source = "C:/var/log" + .record.source | .record.sourcetype = (.tag | ltrimstr("file.")) | .record'
+      <filter tail.containers.**>
+        @type record_transformer
+        enable_ruby
+        <record>
+          sourcetype ${(case "#{record["container_name"]}/#{record["pod"]}"; when "dns-controller/dns-controller" then "kube:dns-controller"; when "sidecar/kube-dns" then "kube:kubedns-sidecar"; when "dnsmasq/kube-dns" then "kube:dnsmasq"; when "etcd-container/etcd-server" then "kube:etcd"; when "etcd-container/etcd-server-events" then "kube:etcd-events"; when "kube-apiserver/kube-apiserver" then "kube:kube-apiserver"; when "kube-controller-manager/kube-controller-manager" then "kube:kube-controller-manager"; when "autoscaler/kube-dns-autoscaler" then "kube:kube-dns-autoscaler"; when "kube-proxy/kube-proxy" then "kube:kube-proxy"; when "kube-scheduler/kube-scheduler" then "kube:kube-scheduler"; when "kubedns/kube-dns" then "kube:kubedns"; else nil end;) || "kube:container:#{record["container_name"]}"}
+        </record>
       </filter>
 
       # = filters for non-container log files =
+      <filter file.kube:kubelet file.kube:kube-proxy file.kube:flanneld>
+        @type record_transformer
+        enable_ruby
+        <record>
+          sourcetype ${tag_suffix[1]}
+        </record>
+      </filter>
+      <filter wineventlog>
+        @type record_transformer
+        <record>
+          sourcetype "kube:docker"
+        </record>
+      </filter>
 
       # = filters for monitor agent =
       <filter monitor_agent>
-        @type jq_transformer
-        jq ".record.source = \"namespace:#{ENV['MY_NAMESPACE']}/pod:#{ENV['MY_POD_NAME']}\" | .record.sourcetype = \"fluentd:monitor-agent\" | .record"
+        @type record_transformer
+        enable_ruby
+        <record>
+          source ${"namespace:#{ENV['MY_NAMESPACE']}/pod:#{ENV['MY_POD_NAME']}"}
+          sourcetype ${"fluentd:monitor-agent"}
+        </record>
+      </filter>
+
+      # = add cluster name to everything =
+      <filter **>
+        @type record_transformer
+        <record>
+          cluster_name "#{ENV['CLUSTER_NAME']}"
+        </record>
       </filter>
 
       # = output =
@@ -224,7 +259,7 @@ data:
         hec_host MY-SPLUNK-HOST
         hec_port 8088
         hec_token "#{ENV['SPLUNK_HEC_TOKEN']}"
-        host "#{ENV['SPLUNK_HEC_HOST']}"
+        host "#{ENV['NODE_NAME']}"
         source_key source
         sourcetype_key sourcetype
         insecure_ssl true
@@ -245,7 +280,7 @@ data:
           retry_max_times 3
           total_limit_size 600m
         </buffer>
-        <format monitor_agent>
+        <format monitor_agent file.kube:kubelet file.kube:kube-proxy file.kube:flanneld>
           @type json
         </format>
         <format>
